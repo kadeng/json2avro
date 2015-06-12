@@ -216,7 +216,7 @@ int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
 
     case AVRO_NULL:
         if (json_typeof(json)==JSON_NULL) {
-            //if (!quiet)
+            if (!quiet)
                 fprintf(stderr, "ERROR: Expecting JSON null for Avro null, got something else: %s\n", json_dumps(json,JSON_COMPACT|JSON_SORT_KEYS|JSON_ENCODE_ANY ));
             return 1;
         }
