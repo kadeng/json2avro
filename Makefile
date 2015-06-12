@@ -1,5 +1,5 @@
 json2avro: json2avro.c avrolib/lib/libavro.so
-	cc -o json2avro json2avro.c avrolib/lib/libavro.a -I avrolib/include -I avro-c/jansson/src -lz -llzma -lsnappy
+	cc -g -o json2avro json2avro.c avrolib/lib/libavro.a -I avrolib/include -I avro-c/jansson/src -lz -llzma -lsnappy
 
 avrolib/lib/libavro.so:
 	mkdir -p avro-c/build

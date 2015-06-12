@@ -94,7 +94,7 @@ static void error_set(json_error_t *error, const lex_t *lex,
         {
             if(lex->saved_text.length <= 20) {
                 snprintf(msg_with_context, JSON_ERROR_TEXT_LENGTH,
-                         "%s near '%s'", msg_text, saved_text);
+                         "%s near '%s' at line %d, col %d", msg_text, saved_text, line, col);
                 result = msg_with_context;
             }
         }

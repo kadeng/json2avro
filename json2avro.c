@@ -48,7 +48,7 @@ char *read_schema_file(char *file_name) {
     }
 
     if (file_size > MAX_SCHEMA_LEN) {
-        fprintf(stderr, "Schema file size is too big: %lld bytes > %lld maximum supported length\n", file_size, MAX_SCHEMA_LEN);
+        fprintf(stderr, "Schema file size is too big\n");
         return 0;
     }
 
@@ -70,23 +70,37 @@ void memory_status() {
     fclose(f);
 }
 
+/*
+#define MSGDEBUG(msg) fprintf(stderr, "%s\n", msg);
+#define MSGDEBUG1(format, arg) fprintf(stderr, format, arg);
+#define MSGDEBUG2(format, arg1, arg2) fprintf(stderr, format, arg1, arg2);
+*/
+
+#define MSGDEBUG(msg) 
+#define MSGDEBUG1(format, arg) 
+#define MSGDEBUG2(format, arg1, arg2) 
+
 int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
                     avro_value_t *current_val, int quiet, int strjson, size_t max_str_sz) {
 
+    MSGDEBUG("P0");
     json = json ? json : dft;
     if (!json) {
         fprintf(stderr, "ERROR: Avro schema does not match JSON\n");
         return 1;
     }
-
+    MSGDEBUG("P1");
+            
     switch (schema->type) {
     case AVRO_RECORD:
     {
-        if (!json_is_object(json)) {
+        MSGDEBUG("Trying record");
+	if (!json_is_object(json)) {
             if (!quiet)
                 fprintf(stderr, "ERROR: Expecting JSON object for Avro record, got something else\n");
             return 1;
         }
+	MSGDEBUG("P2");
 
         int len = avro_schema_record_size(schema), i;
         for (i=0; i<len; i++) {
@@ -95,6 +109,7 @@ int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
             avro_schema_t field_schema = avro_schema_record_field_get_by_index(schema, i);
 
             json_t *json_val = json_object_get(json, name);
+	    MSGDEBUG(name);
             json_t *dft = avro_schema_record_field_default_get_by_index(schema, i);
 
             avro_value_t field;
@@ -110,7 +125,8 @@ int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
         fprintf(stderr, "ERROR: AVRO_LINK is not implemented\n");
         return 1;
         break;
-
+    case AVRO_ENUM:
+	/* TODO, treat as string */
     case AVRO_STRING:
         if (!json_is_string(json)) {
             if (json && strjson) {
@@ -118,6 +134,7 @@ int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
                 char * js = json_dumps(json, JSON_COMPACT|JSON_SORT_KEYS|JSON_ENCODE_ANY);
                 if (max_str_sz && (strlen(js) > max_str_sz))
                     js[max_str_sz] = 0; /* truncate the string - this will result in invalid JSON! */
+		fprintf(stderr, js);
                 avro_value_set_string(current_val, js);
                 free(js);
                 break;
@@ -127,6 +144,7 @@ int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
             return 1;
         } else {
             const char *js = json_string_value(json);
+	    MSGDEBUG(js);
             if (max_str_sz && (strlen(js) > max_str_sz)) {
                 /* truncate the string */
                 char *jst = malloc(strlen(js));
@@ -154,7 +172,7 @@ int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
     case AVRO_INT32:
         if (!json_is_integer(json)) {
             if (!quiet)
-                fprintf(stderr, "ERROR: Expecting JSON integer for Avro int, got something else\n");
+                fprintf(stderr, "ERROR: Expecting JSON integer for Avro int, got something else: %s\n", json_dumps(json, JSON_COMPACT|JSON_SORT_KEYS|JSON_ENCODE_ANY));
             return 1;
         }
         avro_value_set_int(current_val, json_integer_value(json));
@@ -197,22 +215,18 @@ int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
         break;
 
     case AVRO_NULL:
-        if (!json_is_null(json)) {
-            if (!quiet)
-                fprintf(stderr, "ERROR: Expecting JSON null for Avro null, got something else\n");
+        if (json_typeof(json)==JSON_NULL) {
+            //if (!quiet)
+                fprintf(stderr, "ERROR: Expecting JSON null for Avro null, got something else: %s\n", json_dumps(json,JSON_COMPACT|JSON_SORT_KEYS|JSON_ENCODE_ANY ));
             return 1;
         }
         avro_value_set_null(current_val);
         break;
 
-    case AVRO_ENUM:
-        // TODO ???
-        break;
-
     case AVRO_ARRAY:
+	MSGDEBUG("ARRAY");
         if (!json_is_array(json)) {
-            if (!quiet)
-                fprintf(stderr, "ERROR: Expecting JSON array for Avro array, got something else\n");
+            fprintf(stderr, "ERROR: Expecting JSON array for Avro array, got something else %s\n", json_dumps(json, JSON_COMPACT|JSON_SORT_KEYS|JSON_ENCODE_ANY));
             return 1;
         } else {
             int i, len = json_array_size(json);
@@ -227,6 +241,7 @@ int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
         break;
 
     case AVRO_MAP:
+	MSGDEBUG("MAP");
         if (!json_is_object(json)) {
             if (!quiet)
                 fprintf(stderr, "ERROR: Expecting JSON object for Avro map, got something else\n");
@@ -246,13 +261,22 @@ int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
 
     case AVRO_UNION:
     {
-        int i;
+	MSGDEBUG1 ("UNION %d\n", (int) avro_schema_union_size(schema));
+        int i, aret;
         avro_value_t branch;
         for (i=0; i<avro_schema_union_size(schema); i++) {
+            MSGDEBUG1("Trying branch %d\n", i); 
             avro_value_set_branch(current_val, i, &branch);
+	    MSGDEBUG("P-T1");
             avro_schema_t type = avro_schema_union_branch(schema, i);
-            if (!schema_traverse(type, json, NULL, &branch, 1, strjson, max_str_sz))
+	    MSGDEBUG("P-T2");
+	    int aret = schema_traverse(type, json, NULL, &branch, 1, strjson, max_str_sz);
+	    MSGDEBUG("P-T2.5");
+            if (!aret) {
+		MSGDEBUG("break called");
                 break;
+	    }
+	    MSGDEBUG("P-T3");
         }
         if (i==avro_schema_union_size(schema)) {
             fprintf(stderr, "ERROR: No type in the Avro union matched the JSON type we got\n");
@@ -269,6 +293,7 @@ int schema_traverse(const avro_schema_t schema, json_t *json, json_t *dft,
         /* NB: Jansson uses null-terminated strings, so embedded nulls are NOT
            supported, not even escaped ones */
         const char *f = json_string_value(json);
+	MSGDEBUG(f);
         if (!avro_value_set_fixed(current_val, (void *)f, strlen(f))) {
             fprintf(stderr, "ERROR: Setting Avro fixed value FAILED\n");
             return 1;
@@ -463,7 +488,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (avro_schema_from_json_length(schema_arg, strlen(schema_arg), &schema)) {
-        fprintf(stderr, "ERROR: Unable to parse schema: '%s'\n", schema_arg);
+        fprintf(stderr, "ERROR: Unable to parse schema: error: %s\n", avro_strerror());
         exit(EXIT_FAILURE);
     }
 

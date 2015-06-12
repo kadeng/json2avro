@@ -279,6 +279,7 @@ int st_insert(register st_table *table, register st_data_t key, st_data_t value)
 		ADD_DIRECT(table, key, value, hash_val, bin_pos);
 		return 0;
 	} else {
+		printf("Collision on %s and %s", (char*) key, (char*) ptr->key);
 		ptr->record = value;
 		return 1;
 	}

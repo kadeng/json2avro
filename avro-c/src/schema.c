@@ -32,7 +32,7 @@
 #include "st.h"
 #include "schema.h"
 
-#define DEFAULT_TABLE_SIZE 32
+#define DEFAULT_TABLE_SIZE 513
 
 static void avro_schema_init(avro_schema_t schema, avro_type_t type)
 {
